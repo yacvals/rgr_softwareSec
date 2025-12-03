@@ -10,22 +10,34 @@ const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
 const serverRandom = crypto.randomBytes(16).toString('hex');
 
 const server = net.createServer((socket) => {
-  console.log('[server] client connected');
+  let clientRandom;      // ← оголошено тут
+  let sessionKey;
 
   socket.on('data', (raw) => {
     const msg = JSON.parse(raw.toString());
+
     if (msg.type === 'hello') {
+      clientRandom = msg.random; // ← присвоєння
       socket.write(JSON.stringify({
         type: 'serverHello',
         random: serverRandom,
         publicKey,
       }));
     }
+
     if (msg.type === 'premaster') {
-      const premaster = crypto.privateDecrypt(privateKey, Buffer.from(msg.data, 'base64')).toString('hex');
-      sessionKey = crypto.createHash('sha256').update(clientRandom + serverRandom + premaster).digest();
-      console.log('[server] premaster decrypted; sessionKey ready');
+      const premaster = crypto.privateDecrypt(
+        privateKey,
+        Buffer.from(msg.data, 'base64')
+      ).toString('hex');
+
+      sessionKey = crypto.createHash('sha256')
+        .update(clientRandom + serverRandom + premaster)
+        .digest();
+
+      console.log('[server] sessionKey ready:', sessionKey.toString('hex').slice(0, 16));
     }
   });
 });
+
 server.listen(PORT, () => console.log(`[server] listening on ${PORT}`));
