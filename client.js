@@ -13,8 +13,10 @@ let serverHello;
 client.on('data', (raw) => {
   const msg = JSON.parse(raw.toString());
   if (msg.type === 'serverHello') {
-    serverHello = msg; // msg.publicKey, msg.random
+    serverRandom = msg.random;
+    serverPublicKey = msg.publicKey;
     console.log('[client] got serverHello');
+
     const premaster = crypto.randomBytes(16).toString('hex');
     const enc = crypto.publicEncrypt(serverPublicKey, Buffer.from(premaster, 'hex')).toString('base64');
     sessionKey = crypto.createHash('sha256').update(clientRandom + serverRandom + premaster).digest(); // 32B
