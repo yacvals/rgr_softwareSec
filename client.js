@@ -1,17 +1,24 @@
 const net = require('net');
+const crypto = require('crypto');
 
-const PORT = 8080;
-const HOST = '127.0.0.1';
+const HOST = '127.0.0.1', PORT = 8080;
+const clientRandom = crypto.randomBytes(16).toString('hex');
+let serverRandom, serverPublicKey, sessionKey;
 
-const client = net.createConnection({ port: PORT, host: HOST }, () => {
-  console.log('[client] connected to server');
-  client.write('hello from client');
+const client = net.createConnection({ host: HOST, port: PORT }, () => {
+  client.write(JSON.stringify({ type: 'hello', random: clientRandom }));
 });
 
-client.on('data', (data) => {
-  console.log('[client] received:', data.toString());
-});
-
-client.on('end', () => {
-  console.log('[client] disconnected from server');
+let serverHello;
+client.on('data', (raw) => {
+  const msg = JSON.parse(raw.toString());
+  if (msg.type === 'serverHello') {
+    serverHello = msg; // msg.publicKey, msg.random
+    console.log('[client] got serverHello');
+    const premaster = crypto.randomBytes(16).toString('hex');
+    const enc = crypto.publicEncrypt(serverPublicKey, Buffer.from(premaster, 'hex')).toString('base64');
+    sessionKey = crypto.createHash('sha256').update(clientRandom + serverRandom + premaster).digest(); // 32B
+    client.write(JSON.stringify({ type: 'premaster', data: enc }));
+    console.log('[client] premaster sent; sessionKey ready');
+  }
 });
